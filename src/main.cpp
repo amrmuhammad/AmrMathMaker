@@ -1,9 +1,30 @@
 // src/main.cpp - Complete embedding example for Tcl/Tk 9.0
 #include <tcl.h>
 #include <tk.h>
+
+#include <fstream>
+#include <cstdlib>
+#include <array>
+#include <memory>
+#include <vector>
 #include <iostream>
 #include <string>
 
+#include "Equation.hpp"
+
+
+
+// Global storage for equations
+std::vector<MathEquation> equations;
+
+
+// Add this struct for render options
+struct RenderOptions {
+    std::string quality = "-ql";  // -ql (low), -qm (medium), -qh (high)
+    std::string filename = "render_output";
+    bool open_after_render = false;
+};
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 1. Example C++ function that will become a Tcl command
 int SayHello_CPP(ClientData clientData, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]) {
     std::cout << "[C++ Engine] Hello from C++!" << std::endl;
@@ -32,7 +53,176 @@ int AddNumbers_CPP(ClientData clientData, Tcl_Interp* interp, int objc, Tcl_Obj*
     std::cout << "[C++ Engine] Added " << a << " + " << b << " = " << result << std::endl;
     return TCL_OK;
 }
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// The main render function that Tcl calls
+int RenderScene_CPP(ClientData clientData, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]) {
+    std::cout << "[C++] RenderScene_CPP called with " << objc << " arguments" << std::endl;
+    
+    // Parse optional arguments
+    RenderOptions options;
+    if (objc > 1) {
+        options.quality = Tcl_GetString(objv[1]);
+        if (objc > 2) {
+            options.filename = Tcl_GetString(objv[2]);
+        }
+    }
+    
+    try {
+        // 1. Generate the Manim Python script
+        std::string script_path = options.filename + ".py";
+        std::cout << "[C++] Generating script: " << script_path << std::endl;
+        
+        std::ofstream manim_script(script_path);
+        if (!manim_script.is_open()) {
+            throw std::runtime_error("Could not open script file for writing");
+        }
+        
+        // Write the Manim script header
+        manim_script << "from manim import *\n\n";
+        manim_script << "class GeneratedScene(Scene):\n";
+        manim_script << "    def construct(self):\n";
+        
+        // Check if we have equations to render
+        if (equations.empty()) {
+            manim_script << "        # No equations to render\n";
+            manim_script << "        text = Text(\"No equations in scene\", font_size=24)\n";
+            manim_script << "        self.play(Write(text))\n";
+            manim_script << "        self.wait(1)\n";
+        } else {
+            // Add each equation to the script
+            std::cout << "[C++] Adding " << equations.size() << " equations to script" << std::endl;
+            
+            for (size_t i = 0; i < equations.size(); i++) {
+                const auto& eq = equations[i];
+                
+                manim_script << "        # Equation " << i << "\n";
+                manim_script << "        eq" << i << " = MathTex(r\"" 
+                            << eq.latex << "\")\n";
+                manim_script << "        eq" << i << ".move_to([" 
+                            << eq.x << ", " << eq.y << ", 0])\n";
+                manim_script << "        eq" << i << ".set_color(\"" 
+                            << eq.color << "\")\n";
+                manim_script << "        eq" << i << ".scale(" 
+                            << eq.scale << ")\n";
+                
+                // Different animation based on position
+                if (i == 0) {
+                    manim_script << "        self.play(Write(eq" << i << "))\n";
+                } else {
+                    manim_script << "        self.play(TransformFromCopy(eq" << (i-1) << ", eq" << i << "))\n";
+                }
+                manim_script << "        self.wait(0.5)\n\n";
+            }
+        }
+        
+        manim_script.close();
+        std::cout << "[C++] Script generated successfully" << std::endl;
+        
+        // 2. Execute Manim
+        std::string command = "python -m manim " + script_path + " " + options.quality + " 2>&1";
+        std::cout << "[C++] Executing: " << command << std::endl;
+        
+        // Execute and capture output
+        std::array<char, 128> buffer;
+        std::string result;
+        std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(command.c_str(), "r"), pclose);
+        
+        if (!pipe) {
+            throw std::runtime_error("Failed to execute manim command");
+        }
+        
+        while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+            result += buffer.data();
+        }
+        
+        // Check if render was successful
+        if (result.find("File ready at") != std::string::npos) {
+            std::cout << "[C++] Render successful!" << std::endl;
+            
+            // Extract video path from output
+            size_t pos = result.find("File ready at");
+            if (pos != std::string::npos) {
+                std::string video_path = result.substr(pos + 13);
+                // Trim newlines
+                video_path.erase(video_path.find_last_not_of("\n\r") + 1);
+                std::cout << "[C++] Video: " << video_path << std::endl;
+            }
+            
+            Tcl_SetObjResult(interp, Tcl_NewStringObj("✓ Video rendered successfully!", -1));
+            return TCL_OK;
+        } else {
+            std::cerr << "[C++] Render failed. Output:\n" << result << std::endl;
+            Tcl_SetObjResult(interp, Tcl_NewStringObj(("✗ Render failed: " + result.substr(0, 100)).c_str(), -1));
+            return TCL_ERROR;
+        }
+        
+    } catch (const std::exception& e) {
+        std::cerr << "[C++] Exception during render: " << e.what() << std::endl;
+        Tcl_SetObjResult(interp, Tcl_NewStringObj(("✗ Error: " + std::string(e.what())).c_str(), -1));
+        return TCL_ERROR;
+    }
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helper function to get render status
+int GetRenderStatus_CPP(ClientData clientData, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]) {
+    std::string status = "Ready";
+    if (!equations.empty()) {
+        status += " (" + std::to_string(equations.size()) + " equations)";
+    }
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(status.c_str(), -1));
+    return TCL_OK;
+}
 
+// Clear all equations
+int ClearEquations_CPP(ClientData clientData, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]) {
+    std::cout << "[C++] Clearing " << equations.size() << " equations" << std::endl;
+    equations.clear();
+    Tcl_SetObjResult(interp, Tcl_NewStringObj("All equations cleared", -1));
+    return TCL_OK;
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+int AddEquation_CPP(ClientData clientData, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]) {
+    if (objc != 4) {
+        Tcl_WrongNumArgs(interp, 1, objv, "latex_text x y");
+        return TCL_ERROR;
+    }
+    
+    const char* latex = Tcl_GetString(objv[1]);
+    double x, y;
+    
+    if (Tcl_GetDoubleFromObj(interp, objv[2], &x) != TCL_OK ||
+        Tcl_GetDoubleFromObj(interp, objv[3], &y) != TCL_OK) {
+        return TCL_ERROR;
+    }
+    
+    // Add to equations vector
+    equations.emplace_back(latex, x, y);
+    
+    std::cout << "[C++] Added equation: " << latex << " at (" << x << ", " << y << ")" << std::endl;
+    
+    // Return success with equation ID
+    int eq_id = equations.size() - 1;
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(("Equation #" + std::to_string(eq_id) + " added").c_str(), -1));
+    return TCL_OK;
+}
+
+int ListEquations_CPP(ClientData clientData, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]) {
+    // Return list of equations as Tcl list
+    Tcl_Obj* result = Tcl_NewListObj(0, NULL);
+    
+    for (size_t i = 0; i < equations.size(); i++) {
+        const auto& eq = equations[i];
+        Tcl_Obj* eq_obj = Tcl_NewStringObj(("Eq#" + std::to_string(i) + ": " + eq.latex).c_str(), -1);
+        Tcl_ListObjAppendElement(interp, result, eq_obj);
+    }
+    
+    Tcl_SetObjResult(interp, result);
+    return TCL_OK;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char* argv[]) {
     std::cout << "Starting Manim GUI Engine..." << std::endl;
     
@@ -59,11 +249,30 @@ int main(int argc, char* argv[]) {
     }
     
     std::cout << "Tcl/Tk initialized successfully!" << std::endl;
-    
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
     // 7. Register our C++ functions as Tcl commands
     Tcl_CreateObjCommand(interp, "say_hello", SayHello_CPP, nullptr, nullptr);
     Tcl_CreateObjCommand(interp, "add_numbers", AddNumbers_CPP, nullptr, nullptr);
     
+    // Register equation commands
+    Tcl_CreateObjCommand(interp, "add_equation", AddEquation_CPP, nullptr, nullptr);
+    Tcl_CreateObjCommand(interp, "list_equations", ListEquations_CPP, nullptr, nullptr);
+    Tcl_CreateObjCommand(interp, "render_scene", RenderScene_CPP, nullptr, nullptr);  // ADD THIS
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    
+    Tcl_CreateObjCommand(interp, "render_scene", RenderScene_CPP, nullptr, nullptr);
+    Tcl_CreateObjCommand(interp, "get_render_status", GetRenderStatus_CPP, nullptr, nullptr);
+    Tcl_CreateObjCommand(interp, "clear_all_equations", ClearEquations_CPP, nullptr, nullptr);
+
+    // Also add a test command
+    Tcl_CreateObjCommand(interp, "test_render_setup", [](ClientData, Tcl_Interp* interp, int, Tcl_Obj* const[]) -> int {
+        // Test if Manim is available
+        int result = system("python -c \"import manim; print('Manim found:', manim.__version__)\" 2>&1");
+        Tcl_SetObjResult(interp, Tcl_NewStringObj((result == 0) ? "Manim is ready" : "Manim not found", -1));
+        return TCL_OK;
+    }, nullptr, nullptr);
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
     std::cout << "C++ commands registered!" << std::endl;
     
     // 8. Test our C++ commands from Tcl
@@ -77,7 +286,7 @@ int main(int argc, char* argv[]) {
     if (Tcl_Eval(interp, testCommands) != TCL_OK) {
         std::cerr << "Test failed: " << Tcl_GetStringResult(interp) << std::endl;
     }
-    
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
     // 9. Load and run the main Tcl/Tk GUI
     std::cout << "Loading GUI from gui/main.tcl..." << std::endl;
     
@@ -149,16 +358,16 @@ int main(int argc, char* argv[]) {
         std::cout << "No external GUI file found, creating basic interface..." << std::endl;
         Tcl_Eval(interp, basicGUI);
     }
-    
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
     std::cout << "Starting Tk main loop..." << std::endl;
     
     // 10. Start the Tk event loop (this blocks until window closes)
     Tk_MainLoop();
-    
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     std::cout << "Application shutdown." << std::endl;
-    
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
     // 11. Cleanup
     Tcl_DeleteInterp(interp);
-    
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
     return 0;
 }
