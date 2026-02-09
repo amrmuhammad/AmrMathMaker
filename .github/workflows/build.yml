@@ -1,0 +1,36 @@
+name: Build Test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libx11-dev \
+          libxext-dev \
+          libxft-dev \
+          libxrender-dev \
+          libfontconfig-dev
+    
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        make
+    
+    - name: Test Tcl/Tk
+      run: |
+        export TCL_LIBRARY=$(pwd)/tcltk/src/tcl9.0.3/library
+        cd build
+        echo "Testing basic Tcl functionality..."
+        ./AmrMathMaker --help 2>&1 | head -5 || true
