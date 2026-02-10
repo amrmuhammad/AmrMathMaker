@@ -6,13 +6,14 @@
 
 class MathEquation {
 public:
+    int id;
     std::string latex;
     double x, y;
     double scale;
     std::string color;
     
-    MathEquation(const std::string& latex, double x, double y) 
-        : latex(latex), x(x), y(y), scale(1.0), color("black") {}
+    MathEquation(const std::string& latex, double x, double y, int id) 
+        : id(id), latex(latex), x(x), y(y), scale(1.0), color("blue") {}
     
     std::string toManimCode() const {
         // Convert to Manim's MathTex code
