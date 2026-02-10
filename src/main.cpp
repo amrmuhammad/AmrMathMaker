@@ -13,6 +13,9 @@
 #include "Equation.hpp"
 #include "SceneManager.hpp"
 
+#include "HandwritingRenderer.hpp"
+#include <thread>
+#include <chrono>
 
 // Global storage for equations
 std::vector<MathEquation> equations;
@@ -182,6 +185,47 @@ int RenderScene_CPP(ClientData clientData, Tcl_Interp* interp, int objc, Tcl_Obj
     }
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Global instances
+HandwritingRenderer handwritingRenderer;
+Tcl_Interp* global_interp = nullptr;  // Store for callback
+
+// Tcl callback function
+void tclCallback(const std::string& command) {
+    if (global_interp) {
+        Tcl_Eval(global_interp, command.c_str());
+    }
+}
+
+// New Tcl command: render_handwriting
+int RenderHandwriting_CPP(ClientData clientData, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]) {
+    if (objc != 5) {
+        Tcl_WrongNumArgs(interp, 1, objv, "id latex x y");
+        return TCL_ERROR;
+    }
+    
+    int id;
+    const char* latex;
+    double x, y;
+    
+    if (Tcl_GetIntFromObj(interp, objv[1], &id) != TCL_OK ||
+        (latex = Tcl_GetString(objv[2])) == nullptr ||
+        Tcl_GetDoubleFromObj(interp, objv[3], &x) != TCL_OK ||
+        Tcl_GetDoubleFromObj(interp, objv[4], &y) != TCL_OK) {
+        return TCL_ERROR;
+    }
+    
+    // Start handwriting rendering
+    handwritingRenderer.renderHandwriting(latex, x, y, id);
+    
+    // Also add to scene manager for later rendering
+    sceneManager.addEquation(latex, x, y);
+    
+    Tcl_SetObjResult(interp, Tcl_NewStringObj("Handwriting animation started", -1));
+    return TCL_OK;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helper function to get render status
 int GetRenderStatus_CPP(ClientData clientData, Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]) {
     std::string status = "Ready";
@@ -262,6 +306,9 @@ public:
             std::cerr << "Tk_Init failed: " << Tcl_GetStringResult(m_interp) << std::endl;
             return 1;
         }
+     
+        global_interp = m_interp;
+        handwritingRenderer.setTclCallback(tclCallback);
         
         std::cout << "Tcl/Tk initialized successfully!" << std::endl;
         return 1;
@@ -281,7 +328,9 @@ public:
         Tcl_CreateObjCommand(m_interp, "render_scene", RenderScene_CPP, nullptr, nullptr);
         Tcl_CreateObjCommand(m_interp, "get_render_status", GetRenderStatus_CPP, nullptr, nullptr);
         Tcl_CreateObjCommand(m_interp, "clear_all_equations", ClearEquations_CPP, nullptr, nullptr);
-        /////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////////////////////////////        
+        Tcl_CreateObjCommand(m_interp, "render_handwriting", RenderHandwriting_CPP, nullptr, nullptr);
+        ///////////////////////////////////////////////////////////////////////////////////////////////////
         // Also add a test command
         Tcl_CreateObjCommand(m_interp, "test_render_setup", [](ClientData, Tcl_Interp* interp, int, Tcl_Obj* const[]) -> int {
             // Test if Manim is available
@@ -289,7 +338,7 @@ public:
             Tcl_SetObjResult(interp, Tcl_NewStringObj((result == 0) ? "Manim is ready" : "Manim not found", -1));
             return TCL_OK;
         }, nullptr, nullptr);
-        
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         std::cout << "Registering C++ functions as TCL commands completed ..." << std::endl;
         
         return 0;
@@ -308,18 +357,27 @@ public:
             std::cerr << "Test failed: " << Tcl_GetStringResult(m_interp) << std::endl;
         }
     }
+    
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     int load_and_run_main_tcltk_gui() {
     
         // Load and run the main Tcl/Tk GUI
-        std::cout << "Loading GUI from gui/main.tcl..." << std::endl;
+        std::cout << "Loading GUI from buid/gui/main.tcl..." << std::endl;
+        
+        // Get and print the current working directory
+        const char* getCwd = "puts \"Current directory: [pwd]\"";
+        Tcl_Eval(m_interp, getCwd);
+       
         
         // First, let's check if the file exists
-        const char* checkFile = "if {[file exists \"gui/main.tcl\"]} { puts \"GUI file found\" } else { puts \"Error: Can not find gui/main.tcl ...\" }";
+        const char* checkFile = "if {[file exists \"build/gui/main.tcl\"]} { puts \"GUI file found\" } else { puts \"Error: Can not find build/gui/main.tcl ...\" }";
         Tcl_Eval(m_interp, checkFile);
             
         // Try to load external GUI file, fall back to basic GUI
-        int loadResult = Tcl_EvalFile(m_interp, "gui/main.tcl");
+        int loadResult = Tcl_EvalFile(m_interp, "build/gui/main.tcl");
+        
+        std::cout <<  Tcl_GetString(Tcl_GetObjResult(m_interp)) << std::endl;
+        
         if (loadResult != TCL_OK) {
             std::cout << "No external GUI file found ..." << std::endl;
             return 1;

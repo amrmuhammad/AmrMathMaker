@@ -44,7 +44,8 @@ else()
 endif()
 
 # Create executable
-add_executable(AmrMathMaker src/main.cpp)
+add_executable(AmrMathMaker src/main.cpp 
+                            src/HandwritingRenderer.cpp)
 
 # Link libraries - IMPORTANT: Tk must come AFTER Tcl
 target_link_libraries(AmrMathMaker

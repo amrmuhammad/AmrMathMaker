@@ -6,211 +6,258 @@ wm title . "AmrMathMaker Video Tool v1.0"
 wm geometry . 1200x800
 
 #############################################################################################
-# Create a menu bar
-menu .menubar
-. configure -menu .menubar
+proc create_menu_bar {} {
+    # Create a menu bar
+    menu .menubar
+    . configure -menu .menubar
 
-# File menu
-menu .menubar.file -tearoff 0
-.menubar add cascade -label "File" -menu .menubar.file
-.menubar.file add command -label "New Project" -command {new_project}
-.menubar.file add command -label "Open..." -command {open_project}
-.menubar.file add command -label "Save" -command {save_project}
-.menubar.file add separator
-.menubar.file add command -label "Exit" -command {exit}
+    # File menu
+    menu .menubar.file -tearoff 0
+    .menubar add cascade -label "File" -menu .menubar.file
+    .menubar.file add command -label "New Project" -command {new_project}
+    .menubar.file add command -label "Open..." -command {open_project}
+    .menubar.file add command -label "Save" -command {save_project}
+    .menubar.file add separator
+    .menubar.file add command -label "Exit" -command {exit}
 
-# Edit menu
-menu .menubar.edit -tearoff 0
-.menubar add cascade -label "Edit" -menu .menubar.edit
-.menubar.edit add command -label "Undo" -command {undo_action}
-.menubar.edit add command -label "Redo" -command {redo_action}
+    # Edit menu
+    menu .menubar.edit -tearoff 0
+    .menubar add cascade -label "Edit" -menu .menubar.edit
+    .menubar.edit add command -label "Undo" -command {undo_action}
+    .menubar.edit add command -label "Redo" -command {redo_action}
 
-# Render menu
-menu .menubar.render -tearoff 0
-.menubar add cascade -label "Render" -menu .menubar.render
-.menubar.render add command -label "Render Animation" -command render_video
+    # Render menu
+    menu .menubar.render -tearoff 0
+    .menubar add cascade -label "Render" -menu .menubar.render
+    .menubar.render add command -label "Render Animation" -command render_video
 
-# Help menu
-menu .menubar.help -tearoff 0
-.menubar add cascade -label "Help" -menu .menubar.help
-.menubar.help add command -label "About" -command {show_about}
-############################################################################################
-
-############################################################################################
-# MAIN WINDOW STRUCTURE - CORRECTED PACKING ORDER
-############################################################################################
-
-# Main container
-frame .main
-pack .main -fill both -expand 1
-
-#############################################################################
-# BOTTOM SECTION: Pack these FIRST (bottom-up packing)
-#############################################################################
-
-# 1. Status bar (lowest)
-frame .status -height 28 -bg #2c3e50
-pack .status -fill x -side bottom
-
-label .status.text -text "Ready to create math animations..." -fg white -bg #2c3e50 -font {Arial 9}
-pack .status.text -side left -padx 10
-
-# 2. Timeline (above status bar)
-frame .timeline -height 120 -bg #202020
-pack .timeline -fill x -side bottom -pady 2
-
-label .timeline.label -text "TIMELINE" -fg white -bg #202020 -font {Arial 10 bold}
-pack .timeline.label -side top -anchor w -padx 10 -pady 5
-
-canvas .timeline.canvas -height 80 -bg #404040 -highlightthickness 0
-pack .timeline.canvas -fill x -padx 10 -pady 5
-
-# 3. Render frame (above timeline)
-frame .renderframe -bg #f8f8f8 -relief ridge -bd 2
-pack .renderframe -fill x -side bottom -padx 10 -pady 5
-
-label .renderframe.label -text "Render Controls" -bg #e8e8e8 -font {Arial 11 bold}
-pack .renderframe.label -fill x -pady 5
-
-button .renderframe.render -text "▶ Render Video" \
-    -bg "#4CAF50" -fg white -font {Arial 12 bold} \
-    -activebackground "#45a049" \
-    -command render_video
-pack .renderframe.render -pady 10 -padx 20
-
-label .renderframe.status -text "Ready to render" -bg #f8f8f8
-pack .renderframe.status -pady 5
-
-frame .renderframe.progress -bg #f8f8f8
-canvas .renderframe.progress.bar -width 200 -height 20 -bg white -relief sunken -bd 1
-label .renderframe.progress.text -text "0%" -bg #f8f8f8 -width 5
-pack .renderframe.progress.bar -side left
-pack .renderframe.progress.text -side left -padx 10
-pack .renderframe.progress -fill x -padx 20 -pady 5
-pack forget .renderframe.progress  # Hide initially
-
-#############################################################################
-# MIDDLE SECTION: Main content area (fills remaining space)
-#############################################################################
-
-# Container for left panels and canvas
-frame .main.content
-pack .main.content -fill both -expand 1 -pady 5
-
-# Left panels container
-frame .main.content.leftpanels
-pack .main.content.leftpanels -side left -fill y
-
-# 1. Toolbox panel
-frame .main.content.leftpanels.toolbox -width 180 -bg #f0f0f0 -relief raised -bd 1
-pack .main.content.leftpanels.toolbox -side left -fill y -padx 2
-
-label .main.content.leftpanels.toolbox.title -text "TOOLS" -bg #e0e0e0 -font {Arial 10 bold}
-pack .main.content.leftpanels.toolbox.title -fill x -pady 5
-
-foreach btn {select circle rect text arrow} {
-    button .main.content.leftpanels.toolbox.$btn -text [string totitle $btn] -command "set_tool $btn"
-    pack .main.content.leftpanels.toolbox.$btn -fill x -padx 5 -pady 2
+    # Help menu
+    menu .menubar.help -tearoff 0
+    .menubar add cascade -label "Help" -menu .menubar.help
+    .menubar.help add command -label "About" -command {show_about}
 }
+############################################################################################
+proc create_bottom_section {} {
+    #############################################################################
+    # BOTTOM SECTION: Pack these FIRST (bottom-up packing)
+    #############################################################################
 
-# 2. Math symbols panel
-frame .main.content.leftpanels.math -width 180 -bg #e8f4f8 -relief raised -bd 1
-pack .main.content.leftpanels.math -side left -fill y -padx 2
+    # 1. Status bar (lowest)
+    frame .status -height 28 -bg #2c3e50
+    pack .status -fill x -side bottom
 
-label .main.content.leftpanels.math.title -text "Math Symbols" -bg #d0e8f0 -font {Arial 10 bold}
-pack .main.content.leftpanels.math.title -fill x -pady 5
+    label .status.text -text "Ready to create math animations..." -fg white -bg #2c3e50 -font {Arial 9}
+    pack .status.text -side left -padx 10
 
-# Math symbols grid
-set symbols {
-    alpha "α"  beta "β"    gamma "γ"    delta "δ"
-    theta "θ"  pi "π"      sum "∑"      int "∫"
-    sqrt "√"   infty "∞"   pm "±"       times "×"
-    div "÷"    leq "≤"     geq "≥"      neq "≠"
-    approx "≈" frac "a/b"  rightarrow "→" forall "∀"
-    exists "∃" nabla "∇"   partial "∂"  hbar "ħ"
+    # 2. Timeline (above status bar)
+    frame .timeline -height 120 -bg #202020
+    pack .timeline -fill x -side bottom -pady 2
+
+    label .timeline.label -text "TIMELINE" -fg white -bg #202020 -font {Arial 10 bold}
+    pack .timeline.label -side top -anchor w -padx 10 -pady 5
+
+    canvas .timeline.canvas -height 80 -bg #404040 -highlightthickness 0
+    pack .timeline.canvas -fill x -padx 10 -pady 5
+
+    # 3. Render frame (above timeline)
+    frame .renderframe -bg #f8f8f8 -relief ridge -bd 2
+    pack .renderframe -fill x -side bottom -padx 10 -pady 5
+
+    label .renderframe.label -text "Render Controls" -bg #e8e8e8 -font {Arial 11 bold}
+    pack .renderframe.label -fill x -pady 5
+
+    button .renderframe.render -text "▶ Render Video" \
+        -bg "#4CAF50" -fg white -font {Arial 12 bold} \
+        -activebackground "#45a049" \
+        -command render_video
+    pack .renderframe.render -pady 10 -padx 20
+
+    label .renderframe.status -text "Ready to render" -bg #f8f8f8
+    pack .renderframe.status -pady 5
+
+    frame .renderframe.progress -bg #f8f8f8
+    canvas .renderframe.progress.bar -width 200 -height 20 -bg white -relief sunken -bd 1
+    label .renderframe.progress.text -text "0%" -bg #f8f8f8 -width 5
+    pack .renderframe.progress.bar -side left
+    pack .renderframe.progress.text -side left -padx 10
+    pack .renderframe.progress -fill x -padx 20 -pady 5
+    pack forget .renderframe.progress  # Hide initially
+
 }
+##################################################################################################################################
+proc create_toolbox_panel {} {
+    # Toolbox panel
+    frame .main.content.leftpanels.toolbox -width 180 -bg #f0f0f0 -relief raised -bd 1
+    pack .main.content.leftpanels.toolbox -side left -fill y -padx 2
 
-frame .main.content.leftpanels.math.grid
-pack .main.content.leftpanels.math.grid -fill both -expand 1 -padx 5
+    label .main.content.leftpanels.toolbox.title -text "TOOLS" -bg #e0e0e0 -font {Arial 10 bold}
+    pack .main.content.leftpanels.toolbox.title -fill x -pady 5
 
-set row 0
-set col 0
-foreach {name symbol} $symbols {
-    button .main.content.leftpanels.math.grid.$name -text $symbol \
-        -width 3 -font {Arial 12} \
-        -command "insert_math_symbol \"$symbol\""
+    foreach btn {select circle rect text arrow} {
+        button .main.content.leftpanels.toolbox.$btn -text [string totitle $btn] -command "set_tool $btn"
+        pack .main.content.leftpanels.toolbox.$btn -fill x -padx 5 -pady 2
+    }
+}
+##################################################################################################################################
+proc create_math_symbols_panel {} {
+    # Math symbols panel
+    frame .main.content.leftpanels.math -width 180 -bg #e8f4f8 -relief raised -bd 1
+    pack .main.content.leftpanels.math -side left -fill y -padx 2
+
+    label .main.content.leftpanels.math.title -text "Math Symbols" -bg #d0e8f0 -font {Arial 10 bold}
+    pack .main.content.leftpanels.math.title -fill x -pady 5
+
+    # Math symbols grid
+    set symbols {
+        alpha "α"  beta "β"    gamma "γ"    delta "δ"
+        theta "θ"  pi "π"      sum "∑"      int "∫"
+        sqrt "√"   infty "∞"   pm "±"       times "×"
+        div "÷"    leq "≤"     geq "≥"      neq "≠"
+        approx "≈" frac "a/b"  rightarrow "→" forall "∀"
+        exists "∃" nabla "∇"   partial "∂"  hbar "ħ"
+    }
+
+    frame .main.content.leftpanels.math.grid
+    pack .main.content.leftpanels.math.grid -fill both -expand 1 -padx 5
+
+    set row 0
+    set col 0
+    foreach {name symbol} $symbols {
+        button .main.content.leftpanels.math.grid.$name -text $symbol \
+            -width 3 -font {Arial 12} \
+            -command "insert_math_symbol \"$symbol\""
+        
+        grid .main.content.leftpanels.math.grid.$name -row $row -column $col -padx 2 -pady 2
+        
+        set col [expr {$col + 1}]
+        if {$col >= 3} {
+            set col 0
+            incr row
+        }
+    }
+
+    # Equation entry
+    frame .main.content.leftpanels.math.eqentry -bg #e8f4f8
+    pack .main.content.leftpanels.math.eqentry -fill x -padx 5 -pady 10
+
+    label .main.content.leftpanels.math.eqentry.label -text "LaTeX:" -bg #e8f4f8
+    entry .main.content.leftpanels.math.eqentry.entry -width 15
+    button .main.content.leftpanels.math.eqentry.insert -text "Add" -command add_equation_from_entry
+
+    pack .main.content.leftpanels.math.eqentry.label -side left
+    pack .main.content.leftpanels.math.eqentry.entry -side left -padx 5
+    pack .main.content.leftpanels.math.eqentry.insert -side left
+
+    # Equation preview
+    frame .main.content.leftpanels.math.preview -height 60 -bg white -relief sunken -bd 1
+    pack .main.content.leftpanels.math.preview -fill x -padx 5 -pady 5
+
+    canvas .main.content.leftpanels.math.preview.canvas -height 40 -bg white -highlightthickness 0
+    pack .main.content.leftpanels.math.preview.canvas -fill both -expand 1
+
+}
+##################################################################################################################################
+proc create_canvas_area {} {
+
+    # Canvas area (takes remaining space)
+    frame .main.content.canvasarea
+    pack .main.content.canvasarea -side left -fill both -expand 1 -padx 5
+
+    label .main.content.canvasarea.label -text "ANIMATION CANVAS" -font {Arial 12 bold}
+    pack .main.content.canvasarea.label -pady 5
+
+    canvas .main.content.canvasarea.canvas -bg white -relief sunken -bd 2
+    pack .main.content.canvasarea.canvas -fill both -expand 1
     
-    grid .main.content.leftpanels.math.grid.$name -row $row -column $col -padx 2 -pady 2
     
-    set col [expr {$col + 1}]
-    if {$col >= 3} {
-        set col 0
-        incr row
-    }
+    # Add canvas click handler to select equations
+    #bind .main.content.canvasarea.canvas <Button-1> {
+    #    set item [%W find withtag current]
+    #    if {$item ne ""} {
+    #        set tags [%W gettags $item]
+    #        foreach tag $tags {
+    #            if {[string match "eq_*" $tag]} {
+    #                set eq_id [string range $tag 3 end]
+    #                .status.text configure -text "Selected equation #$eq_id"
+    #                break
+    #            }
+    #        }
+    #    }
+    #}
 }
+##################################################################################################################################
+proc create_properties_panel {} {
+    # Properties panel (right side)
+    frame .main.content.props -width 250 -bg #f8f8f8 -relief raised -bd 1
+    pack .main.content.props -side right -fill y -padx 2
 
-# Equation entry
-frame .main.content.leftpanels.math.eqentry -bg #e8f4f8
-pack .main.content.leftpanels.math.eqentry -fill x -padx 5 -pady 10
+    label .main.content.props.title -text "PROPERTIES" -bg #e8e8e8 -font {Arial 10 bold}
+    pack .main.content.props.title -fill x -pady 5
 
-label .main.content.leftpanels.math.eqentry.label -text "LaTeX:" -bg #e8f4f8
-entry .main.content.leftpanels.math.eqentry.entry -width 15
-button .main.content.leftpanels.math.eqentry.insert -text "Add" -command add_equation_from_entry
+    frame .main.content.props.color -bg #f8f8f8
+    label .main.content.props.color.label -text "Color:" -bg #f8f8f8
+    entry .main.content.props.color.entry -width 15
+    .main.content.props.color.entry insert 0 "#3498db"
+    pack .main.content.props.color.label .main.content.props.color.entry -side left -padx 5
+    pack .main.content.props.color -anchor w -padx 10 -pady 5
+}
+##################################################################################################################################
+proc create_main_window {} {
 
-pack .main.content.leftpanels.math.eqentry.label -side left
-pack .main.content.leftpanels.math.eqentry.entry -side left -padx 5
-pack .main.content.leftpanels.math.eqentry.insert -side left
+    puts "DEBUG: create_main_window started..."
+    ############################################################################################
+    # MAIN WINDOW STRUCTURE 
+    ############################################################################################
 
-# Equation preview
-frame .main.content.leftpanels.math.preview -height 60 -bg white -relief sunken -bd 1
-pack .main.content.leftpanels.math.preview -fill x -padx 5 -pady 5
+    # Main container
+    frame .main
+    pack .main -fill both -expand 1
 
-canvas .main.content.leftpanels.math.preview.canvas -height 40 -bg white -highlightthickness 0
-pack .main.content.leftpanels.math.preview.canvas -fill both -expand 1
+    create_bottom_section
+    
+    #############################################################################
+    # MIDDLE SECTION: Main content area (fills remaining space)
+    #############################################################################
 
-# 3. Canvas area (takes remaining space)
-frame .main.content.canvasarea
-pack .main.content.canvasarea -side left -fill both -expand 1 -padx 5
+    # Container for left panels and canvas
+    frame .main.content
+    pack .main.content -fill both -expand 1 -pady 5
 
-label .main.content.canvasarea.label -text "ANIMATION CANVAS" -font {Arial 12 bold}
-pack .main.content.canvasarea.label -pady 5
+    # Left panels container
+    frame .main.content.leftpanels
+    pack .main.content.leftpanels -side left -fill y
 
-canvas .main.content.canvasarea.canvas -bg white -relief sunken -bd 2
-pack .main.content.canvasarea.canvas -fill both -expand 1
+    create_toolbox_panel    
+    #create_math_symbols_panel    
+    create_canvas_area
+    create_properties_panel
 
-# 4. Properties panel (right side)
-frame .main.content.props -width 250 -bg #f8f8f8 -relief raised -bd 1
-pack .main.content.props -side right -fill y -padx 2
+    puts "DEBUG: create_main_window completed..."
+}
+#################################################################################################################
+proc test_cpp_integration {} {
+    
+    # Test C++ integration buttons
+    frame .main.content.leftpanels.toolbox.testframe -bg #f0f0f0
+    pack .main.content.leftpanels.toolbox.testframe -fill x -padx 5 -pady 10
 
-label .main.content.props.title -text "PROPERTIES" -bg #e8e8e8 -font {Arial 10 bold}
-pack .main.content.props.title -fill x -pady 5
+    button .main.content.leftpanels.toolbox.testframe.testcpp -text "Test C++" \
+        -command {
+            set result [say_hello]
+            .status.text configure -text $result
+        }
+    button .main.content.leftpanels.toolbox.testframe.testadd -text "Test Math" \
+        -command {
+            set sum [add_numbers 42 58]
+            .status.text configure -text "42 + 58 = $sum"
+        }
 
-frame .main.content.props.color -bg #f8f8f8
-label .main.content.props.color.label -text "Color:" -bg #f8f8f8
-entry .main.content.props.color.entry -width 15
-.main.content.props.color.entry insert 0 "#3498db"
-pack .main.content.props.color.label .main.content.props.color.entry -side left -padx 5
-pack .main.content.props.color -anchor w -padx 10 -pady 5
+    pack .main.content.leftpanels.toolbox.testframe.testcpp \
+         .main.content.leftpanels.toolbox.testframe.testadd \
+         -fill x -pady 2
 
-##############################################################################################
-# Test C++ integration buttons
-frame .main.content.leftpanels.toolbox.testframe -bg #f0f0f0
-pack .main.content.leftpanels.toolbox.testframe -fill x -padx 5 -pady 10
-
-button .main.content.leftpanels.toolbox.testframe.testcpp -text "Test C++" \
-    -command {
-        set result [say_hello]
-        .status.text configure -text $result
-    }
-button .main.content.leftpanels.toolbox.testframe.testadd -text "Test Math" \
-    -command {
-        set sum [add_numbers 42 58]
-        .status.text configure -text "42 + 58 = $sum"
-    }
-
-pack .main.content.leftpanels.toolbox.testframe.testcpp \
-     .main.content.leftpanels.toolbox.testframe.testadd \
-     -fill x -pady 2
+}
+#################################################################################################################
 
 ##############################################################################################
 # PROCEDURES
@@ -284,20 +331,7 @@ proc draw_equations_on_canvas {} {
     }
 }
 
-# Add canvas click handler to select equations
-bind .main.content.canvasarea.canvas <Button-1> {
-    set item [%W find withtag current]
-    if {$item ne ""} {
-        set tags [%W gettags $item]
-        foreach tag $tags {
-            if {[string match "eq_*" $tag]} {
-                set eq_id [string range $tag 3 end]
-                .status.text configure -text "Selected equation #$eq_id"
-                break
-            }
-        }
-    }
-}
+
 
 proc redraw_canvas {} {
     .main.content.canvasarea.canvas delete all
@@ -412,6 +446,20 @@ proc undo_action {} { tk_messageBox -message "Undo" -type ok }
 proc redo_action {} { tk_messageBox -message "Redo" -type ok }
 proc show_about {} { tk_messageBox -message "AmrMathMaker v1.0\nMath Video Tool" -type ok }
 proc set_tool {tool} { .status.text configure -text "Selected tool: $tool" }
+
+
+##########################################################################################################################
+
+puts "Before Window creation ..."
+
+create_menu_bar
+create_main_window
+test_cpp_integration
+
+puts "After Window creation ..."
+
+##########################################################################################################################
+
 
 ##############################################################################################
 # STARTUP
